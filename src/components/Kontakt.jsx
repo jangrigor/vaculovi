@@ -6,8 +6,8 @@ const contactInfo = {
   phone: '[TELEFON_PLACEHOLDER]',
   email: '[EMAIL_PLACEHOLDER]',
   address: '[ADRESA_PLACEHOLDER]',
-  // Po doplnění skutečné adresy ji nastavte i sem — mapa se vycentruje sama.
-  mapQuery: 'Morava, Česko',
+  // Souřadnice farmy — mapa se na ně vycentruje.
+  mapQuery: '50.12490003789712,17.63789405205469',
 }
 
 const FORMSPREE_ENDPOINT = 'https://formspree.io/f/[FORMSPREE_FORM_ID]'

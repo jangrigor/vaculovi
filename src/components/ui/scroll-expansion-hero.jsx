@@ -5,6 +5,7 @@ import { motion } from 'framer-motion'
 // barvy textu přizpůsobeny paletě webu (wheat místo blue-200).
 // Navíc poslouchá event 'expandHeroMedia', aby navigační odkazy mohly
 // přeskočit scroll-lock a rovnou rozbalit video.
+// scrubOnScroll: video nehraje samo — přehrává se podle scrollu (dolů vpřed, nahoru zpět).
 const ScrollExpandMedia = ({
   mediaType = 'video',
   mediaSrc,
@@ -14,6 +15,7 @@ const ScrollExpandMedia = ({
   date,
   scrollToExpand,
   textBlend,
+  scrubOnScroll = false,
   children,
 }) => {
   const [scrollProgress, setScrollProgress] = useState(0)
@@ -23,6 +25,25 @@ const ScrollExpandMedia = ({
   const [isMobileState, setIsMobileState] = useState(false)
 
   const sectionRef = useRef(null)
+  const videoRef = useRef(null)
+  const progressRef = useRef(0)
+  progressRef.current = scrollProgress
+
+  // Plynulé dotahování času videa k pozici scrollu (lerp; interval běží
+  // i v tabu na pozadí, na rozdíl od requestAnimationFrame)
+  useEffect(() => {
+    if (!scrubOnScroll || mediaType !== 'video') return
+    const tick = () => {
+      const v = videoRef.current
+      if (v && v.duration && !Number.isNaN(v.duration)) {
+        const target = progressRef.current * Math.max(0, v.duration - 0.05)
+        const diff = target - v.currentTime
+        if (Math.abs(diff) > 0.02) v.currentTime += diff * 0.22
+      }
+    }
+    const interval = setInterval(tick, 1000 / 60)
+    return () => clearInterval(interval)
+  }, [scrubOnScroll, mediaType])
 
   useEffect(() => {
     setScrollProgress(0)
@@ -207,11 +228,12 @@ const ScrollExpandMedia = ({
                   ) : (
                     <div className='relative w-full h-full pointer-events-none'>
                       <video
+                        ref={videoRef}
                         src={mediaSrc}
                         poster={posterSrc}
-                        autoPlay
+                        autoPlay={!scrubOnScroll}
                         muted
-                        loop
+                        loop={!scrubOnScroll}
                         playsInline
                         preload='auto'
                         className='w-full h-full object-cover rounded-xl'

@@ -127,7 +127,8 @@ export default function Hero() {
         bgImageSrc="media/hero-poster.jpg"
         title="Pěstujeme poctivé obilí"
         date="Statek Vaculovi"
-        scrollToExpand="Posouváním rozbalte video"
+        scrollToExpand="Posouváním rozehrajete video"
+        scrubOnScroll
       >
         <div className="mx-auto flex max-w-2xl flex-col items-center text-center">
           <h1 className="font-instrument-serif text-3xl text-wheat md:text-4xl">
