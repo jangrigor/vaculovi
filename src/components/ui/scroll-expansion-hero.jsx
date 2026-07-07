@@ -29,6 +29,29 @@ const ScrollExpandMedia = ({
   const progressRef = useRef(0)
   progressRef.current = scrollProgress
 
+  // iOS/Safari bez play() video vůbec nenačte (ignoruje preload) a při
+  // seekování pak nevykreslí snímek — krátké play→pause načítání odemkne.
+  useEffect(() => {
+    if (!scrubOnScroll || mediaType !== 'video') return
+    const v = videoRef.current
+    if (!v) return
+    let cancelled = false
+    const promise = v.play()
+    if (promise) {
+      promise
+        .then(() => {
+          if (!cancelled) {
+            v.pause()
+            v.currentTime = 0
+          }
+        })
+        .catch(() => {})
+    }
+    return () => {
+      cancelled = true
+    }
+  }, [scrubOnScroll, mediaType])
+
   // Plynulé dotahování času videa k pozici scrollu (lerp; interval běží
   // i v tabu na pozadí, na rozdíl od requestAnimationFrame)
   useEffect(() => {

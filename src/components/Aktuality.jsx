@@ -40,6 +40,8 @@ function NewsCard({ item }) {
           <img
             src={item.image}
             alt={item.title}
+            loading="lazy"
+            decoding="async"
             className="h-44 w-full shrink-0 rounded-lg object-cover"
           />
         )}
