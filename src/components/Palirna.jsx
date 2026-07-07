@@ -1,94 +1,42 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { ArrowRight } from 'lucide-react'
 
-// Kurzorové „kukátko“: přes základní fotku kotle se maskou (radiální gradient
-// kreslený do canvasu) odhaluje druhý obrázek — průřez, co se děje uvnitř.
-// Obrázky jsou čtvercové (1:1) a leží v centrovaném rámu, aby se na širokých
-// obrazovkách neořezávaly; maska se počítá v souřadnicích rámu.
+// Kurzorové „kukátko“: přes základní fotku kotle se maskou odhaluje druhý
+// obrázek — průřez, co se děje uvnitř. Maska je čisté CSS (radial-gradient),
+// které prohlížeč skládá na GPU. Dřívější verze kreslila masku do canvasu
+// a každý snímek ji převáděla přes toDataURL() na PNG — dekódování nové
+// masky každých 16 ms způsobovalo na mobilu sekání a problikávání obrázků.
+// Pozice se vyhlazuje v requestAnimationFrame a zapisuje přímo do stylu,
+// bez React re-renderu na každý snímek.
 // Na dotykových zařízeních (bez kurzoru) putuje reflektor po kotli podle scrollu.
-function RevealLayer({ image, cursorX, cursorY }) {
-  const canvasRef = useRef(null)
-  const revealRef = useRef(null)
 
-  useEffect(() => {
-    const canvas = canvasRef.current
-    if (!canvas) return
-    const resize = () => {
-      const parent = canvas.parentElement
-      canvas.width = parent.offsetWidth
-      canvas.height = parent.offsetHeight
-    }
-    resize()
-    window.addEventListener('resize', resize)
-    return () => window.removeEventListener('resize', resize)
-  }, [])
-
-  useEffect(() => {
-    const canvas = canvasRef.current
-    const reveal = revealRef.current
-    if (!canvas || !reveal || !canvas.width) return
-    const ctx = canvas.getContext('2d')
-    ctx.clearRect(0, 0, canvas.width, canvas.height)
-
-    // Poloměr úměrný velikosti rámu (na mobilu menší, na desktopu ~260 px)
-    const radius = Math.min(260, canvas.width * 0.32)
-
-    const gradient = ctx.createRadialGradient(cursorX, cursorY, 0, cursorX, cursorY, radius)
-    gradient.addColorStop(0, 'rgba(255,255,255,1)')
-    gradient.addColorStop(0.4, 'rgba(255,255,255,1)')
-    gradient.addColorStop(0.6, 'rgba(255,255,255,0.75)')
-    gradient.addColorStop(0.75, 'rgba(255,255,255,0.4)')
-    gradient.addColorStop(0.88, 'rgba(255,255,255,0.12)')
-    gradient.addColorStop(1, 'rgba(255,255,255,0)')
-
-    ctx.fillStyle = gradient
-    ctx.beginPath()
-    ctx.arc(cursorX, cursorY, radius, 0, Math.PI * 2)
-    ctx.fill()
-
-    const mask = `url(${canvas.toDataURL()})`
-    reveal.style.maskImage = mask
-    reveal.style.webkitMaskImage = mask
-    reveal.style.maskSize = '100% 100%'
-    reveal.style.webkitMaskSize = '100% 100%'
-  }, [cursorX, cursorY])
-
-  return (
-    <>
-      <canvas
-        ref={canvasRef}
-        className="pointer-events-none absolute inset-0"
-        style={{ display: 'none' }}
-      />
-      <div
-        ref={revealRef}
-        className="pointer-events-none absolute inset-0 z-30 bg-cover bg-center bg-no-repeat"
-        style={{ backgroundImage: `url(${image})` }}
-      />
-    </>
-  )
-}
+// Výchozí maska: nic neodhaluje (kruh mimo obraz)
+const HIDDEN_MASK = 'radial-gradient(circle 1px at -100px -100px, black, transparent)'
 
 export default function Palirna() {
   const sectionRef = useRef(null)
   const frameRef = useRef(null)
-  const mouse = useRef({ x: -999, y: -999 })
-  const smooth = useRef({ x: -999, y: -999 })
-  const loopRef = useRef(null)
-  const [cursorPos, setCursorPos] = useState({ x: -999, y: -999 })
+  const revealRef = useRef(null)
 
   useEffect(() => {
     const section = sectionRef.current
     const frame = frameRef.current
-    if (!section || !frame) return
+    const reveal = revealRef.current
+    if (!section || !frame || !reveal) return
 
     const isTouch = window.matchMedia('(hover: none)').matches
+    const mouse = { x: -999, y: -999 }
+    const smooth = { x: -999, y: -999 }
 
     // Souřadnice relativně k rámu s obrázkem
     const handleMove = (e) => {
       const rect = frame.getBoundingClientRect()
-      mouse.current = { x: e.clientX - rect.left, y: e.clientY - rect.top }
-      if (smooth.current.x < -500) smooth.current = { ...mouse.current }
+      mouse.x = e.clientX - rect.left
+      mouse.y = e.clientY - rect.top
+      if (smooth.x < -500) {
+        smooth.x = mouse.x
+        smooth.y = mouse.y
+      }
     }
 
     // Mobil: reflektor sjíždí po kotli shora dolů podle průchodu sekce viewportem
@@ -96,36 +44,47 @@ export default function Palirna() {
       const rect = section.getBoundingClientRect()
       const vh = window.innerHeight
       const progress = Math.min(1, Math.max(0, (vh - rect.top) / (vh + rect.height)))
-      const frameRect = frame.getBoundingClientRect()
-      mouse.current = {
-        x: frameRect.width / 2,
-        y: frameRect.height * (0.1 + progress * 0.8),
+      mouse.x = frame.offsetWidth / 2
+      mouse.y = frame.offsetHeight * (0.1 + progress * 0.8)
+      if (smooth.x < -500) {
+        smooth.x = mouse.x
+        smooth.y = mouse.y
       }
-      if (smooth.current.x < -500) smooth.current = { ...mouse.current }
+    }
+
+    const applyMask = () => {
+      // Poloměr úměrný velikosti rámu (na mobilu menší, na desktopu ~260 px)
+      const radius = Math.min(260, frame.offsetWidth * 0.32)
+      const mask = `radial-gradient(circle ${radius}px at ${smooth.x.toFixed(1)}px ${smooth.y.toFixed(1)}px, rgb(0 0 0) 40%, rgb(0 0 0 / 0.75) 60%, rgb(0 0 0 / 0.4) 75%, rgb(0 0 0 / 0.12) 88%, transparent 100%)`
+      reveal.style.maskImage = mask
+      reveal.style.webkitMaskImage = mask
+    }
+
+    let raf
+    const loop = () => {
+      const dx = mouse.x - smooth.x
+      const dy = mouse.y - smooth.y
+      if (Math.abs(dx) > 0.1 || Math.abs(dy) > 0.1) {
+        smooth.x += dx * 0.1
+        smooth.y += dy * 0.1
+        applyMask()
+      }
+      raf = requestAnimationFrame(loop)
     }
 
     if (isTouch) {
       window.addEventListener('scroll', handleScroll, { passive: true })
       handleScroll()
+      if (smooth.x > -500) applyMask()
     } else {
       section.addEventListener('pointermove', handleMove)
     }
-
-    // setInterval místo requestAnimationFrame — rAF se zastaví v tabu na pozadí
-    const loop = () => {
-      const dx = mouse.current.x - smooth.current.x
-      const dy = mouse.current.y - smooth.current.y
-      if (Math.abs(dx) < 0.1 && Math.abs(dy) < 0.1) return
-      smooth.current.x += dx * 0.1
-      smooth.current.y += dy * 0.1
-      setCursorPos({ x: smooth.current.x, y: smooth.current.y })
-    }
-    loopRef.current = setInterval(loop, 1000 / 60)
+    raf = requestAnimationFrame(loop)
 
     return () => {
       window.removeEventListener('scroll', handleScroll)
       section.removeEventListener('pointermove', handleMove)
-      clearInterval(loopRef.current)
+      cancelAnimationFrame(raf)
     }
   }, [])
 
@@ -138,7 +97,9 @@ export default function Palirna() {
       id="palirna"
       ref={sectionRef}
       className="relative w-full overflow-hidden bg-[#0d0a07]"
-      style={{ height: '100dvh' }}
+      // svh místo dvh — dvh se mění při schovávání adresního řádku na mobilu
+      // a sekce by při scrollu měnila výšku (skákání a překreslování obrázků)
+      style={{ height: '100svh' }}
     >
       <div
         ref={frameRef}
@@ -148,10 +109,14 @@ export default function Palirna() {
           className="absolute inset-0 z-10 bg-cover bg-center bg-no-repeat"
           style={{ backgroundImage: 'url(media/palirna-base.jpg)' }}
         />
-        <RevealLayer
-          image="media/palirna-reveal.jpg"
-          cursorX={cursorPos.x}
-          cursorY={cursorPos.y}
+        <div
+          ref={revealRef}
+          className="pointer-events-none absolute inset-0 z-30 bg-cover bg-center bg-no-repeat"
+          style={{
+            backgroundImage: 'url(media/palirna-reveal.jpg)',
+            maskImage: HIDDEN_MASK,
+            WebkitMaskImage: HIDDEN_MASK,
+          }}
         />
       </div>
 

@@ -22,6 +22,11 @@ body,
   min-height: 100%;
 }
 
+/* Menu je ukotvené (fixed) — po kliknutí na kotvu nesmí překrýt začátek sekce */
+section[id] {
+  scroll-margin-top: 4rem;
+}
+
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }

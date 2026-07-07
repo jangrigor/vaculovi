@@ -15,6 +15,13 @@ const sizeMap = {
   lg: 'w-80 h-96',
 }
 
+// Na dotykových zařízeních není kurzor, takže spotlight nemá co sledovat.
+// Navíc background-attachment: fixed nutí mobilní prohlížeče překreslovat
+// karty při každém scrollu (problikávání) a touch-action: none blokoval
+// posouvání stránky prstem přes kartu — na mobilu efekt celý vypínáme.
+const isTouch =
+  typeof window !== 'undefined' && window.matchMedia('(hover: none)').matches
+
 const GlowCard = ({
   children,
   className = '',
@@ -28,6 +35,7 @@ const GlowCard = ({
   const innerRef = useRef(null)
 
   useEffect(() => {
+    if (isTouch) return
     const syncPointer = (e) => {
       const { clientX: x, clientY: y } = e
 
@@ -65,19 +73,25 @@ const GlowCard = ({
       '--border-size': 'calc(var(--border, 2) * 1px)',
       '--spotlight-size': 'calc(var(--size, 150) * 1px)',
       '--hue': 'calc(var(--base) + (var(--xp, 0) * var(--spread, 0)))',
-      backgroundImage: `radial-gradient(
-        var(--spotlight-size) var(--spotlight-size) at
-        calc(var(--x, 0) * 1px)
-        calc(var(--y, 0) * 1px),
-        hsl(var(--hue, 210) calc(var(--saturation, 100) * 1%) calc(var(--lightness, 70) * 1%) / var(--bg-spot-opacity, 0.1)), transparent
-      )`,
       backgroundColor: 'var(--backdrop, transparent)',
-      backgroundSize: 'calc(100% + (2 * var(--border-size))) calc(100% + (2 * var(--border-size)))',
-      backgroundPosition: '50% 50%',
-      backgroundAttachment: 'fixed',
       border: 'var(--border-size) solid var(--backup-border)',
       position: 'relative',
-      touchAction: 'none',
+    }
+
+    if (!isTouch) {
+      Object.assign(baseStyles, {
+        backgroundImage: `radial-gradient(
+          var(--spotlight-size) var(--spotlight-size) at
+          calc(var(--x, 0) * 1px)
+          calc(var(--y, 0) * 1px),
+          hsl(var(--hue, 210) calc(var(--saturation, 100) * 1%) calc(var(--lightness, 70) * 1%) / var(--bg-spot-opacity, 0.1)), transparent
+        )`,
+        backgroundSize:
+          'calc(100% + (2 * var(--border-size))) calc(100% + (2 * var(--border-size)))',
+        backgroundPosition: '50% 50%',
+        backgroundAttachment: 'fixed',
+        touchAction: 'none',
+      })
     }
 
     if (width !== undefined) {
@@ -144,6 +158,16 @@ const GlowCard = ({
       inset: -10px;
       border-width: 10px;
     }
+
+    /* Dotyková zařízení: žádný spotlight — pseudo-vrstvy s
+       background-attachment: fixed by nutily překreslování při scrollu */
+    @media (hover: none) {
+      [data-glow]::before,
+      [data-glow]::after,
+      [data-glow] [data-glow] {
+        display: none;
+      }
+    }
   `
 
   return (
@@ -163,7 +187,7 @@ const GlowCard = ({
           shadow-[0_1rem_2rem_-1rem_black]
           p-4
           gap-4
-          backdrop-blur-[5px]
+          ${isTouch ? '' : 'backdrop-blur-[5px]'}
           ${className}
         `}
       >

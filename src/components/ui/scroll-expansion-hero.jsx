@@ -86,10 +86,9 @@ const ScrollExpandMedia = ({
 
   useEffect(() => {
     const handleWheel = (e) => {
-      if (mediaFullyExpanded && e.deltaY < 0 && window.scrollY <= 5) {
-        setMediaFullyExpanded(false)
-        e.preventDefault()
-      } else if (!mediaFullyExpanded) {
+      if (mediaFullyExpanded) {
+        if (e.deltaY < 0 && window.scrollY <= 5) setMediaFullyExpanded(false)
+      } else {
         e.preventDefault()
         const scrollDelta = e.deltaY * 0.0009
         const newProgress = Math.min(Math.max(scrollProgress + scrollDelta, 0), 1)
@@ -114,10 +113,9 @@ const ScrollExpandMedia = ({
       const touchY = e.touches[0].clientY
       const deltaY = touchStartY - touchY
 
-      if (mediaFullyExpanded && deltaY < -20 && window.scrollY <= 5) {
-        setMediaFullyExpanded(false)
-        e.preventDefault()
-      } else if (!mediaFullyExpanded) {
+      if (mediaFullyExpanded) {
+        if (deltaY < -20 && window.scrollY <= 5) setMediaFullyExpanded(false)
+      } else {
         e.preventDefault()
         // Increase sensitivity for mobile, especially when scrolling back
         const scrollFactor = deltaY < 0 ? 0.008 : 0.005
@@ -146,11 +144,15 @@ const ScrollExpandMedia = ({
       }
     }
 
-    window.addEventListener('wheel', handleWheel, { passive: false })
-    window.addEventListener('scroll', handleScroll)
-    window.addEventListener('touchstart', handleTouchStart, { passive: false })
-    window.addEventListener('touchmove', handleTouchMove, { passive: false })
-    window.addEventListener('touchend', handleTouchEnd)
+    // Non-passive listenery blokují nativní scroll (prohlížeč musí čekat na
+    // JS u každého pohybu prstem = sekání) — potřeba jsou jen během
+    // scroll-locku, dokud se video rozbaluje. Po rozbalení passive: true.
+    const passive = { passive: mediaFullyExpanded }
+    window.addEventListener('wheel', handleWheel, passive)
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    window.addEventListener('touchstart', handleTouchStart, { passive: true })
+    window.addEventListener('touchmove', handleTouchMove, passive)
+    window.addEventListener('touchend', handleTouchEnd, { passive: true })
 
     return () => {
       window.removeEventListener('wheel', handleWheel)
