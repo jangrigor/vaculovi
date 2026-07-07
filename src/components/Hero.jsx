@@ -5,6 +5,7 @@ import ScrollExpandMedia from '@/components/ui/scroll-expansion-hero'
 const NAV_LINKS = [
   { label: 'O nás', id: 'o-nas' },
   { label: 'Aktuality', id: 'aktuality' },
+  { label: 'Palírna', id: 'palirna' },
 ]
 
 // Hero používá scroll-lock (video se nejdřív rozbaluje) — před scrollem na kotvu

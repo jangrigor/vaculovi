@@ -3,7 +3,11 @@ import { Phone, Mail, MapPin } from 'lucide-react'
 import { GlowCard } from '@/components/ui/spotlight-card'
 
 const contactInfo = {
-  phone: '[TELEFON_PLACEHOLDER]',
+  // Doplňte telefonní čísla — odkaz tel: se vytvoří automaticky.
+  people: [
+    { name: 'Petr Vacula', phone: '[TELEFON_PLACEHOLDER]' },
+    { name: 'Tadeusz Vacula', phone: '[TELEFON_PLACEHOLDER]' },
+  ],
   email: '[EMAIL_PLACEHOLDER]',
   address: '[ADRESA_PLACEHOLDER]',
   // Souřadnice farmy — mapa se na ně vycentruje.
@@ -53,12 +57,18 @@ export default function Kontakt() {
         <div className="grid gap-12 md:grid-cols-2">
           <GlowCard glowColor="orange" customSize className="w-full self-start p-6 md:p-8">
             <div className="space-y-4 font-sans text-sm text-wheat md:text-base">
-              <div className="flex items-center gap-3">
-                <Phone size={18} className="shrink-0 text-grain" />
-                <a href={`tel:${contactInfo.phone}`} className="hover:text-grain">
-                  {contactInfo.phone}
-                </a>
-              </div>
+              {contactInfo.people.map((person) => (
+                <div key={person.name} className="flex items-center gap-3">
+                  <Phone size={18} className="shrink-0 text-grain" />
+                  <span>
+                    {person.name}
+                    {' — '}
+                    <a href={`tel:${person.phone}`} className="hover:text-grain">
+                      {person.phone}
+                    </a>
+                  </span>
+                </div>
+              ))}
               <div className="flex items-center gap-3">
                 <Mail size={18} className="shrink-0 text-grain" />
                 <a href={`mailto:${contactInfo.email}`} className="hover:text-grain">
