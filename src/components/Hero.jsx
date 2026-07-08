@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ArrowRight, Newspaper } from 'lucide-react'
 import ScrollExpandMedia from '@/components/ui/scroll-expansion-hero'
 
@@ -87,30 +87,83 @@ function MobileMenu({ open, onNavigate }) {
 
 export default function Hero() {
   const [menuOpen, setMenuOpen] = useState(false)
+  const [activeId, setActiveId] = useState('o-nas')
+  const [scrolled, setScrolled] = useState(false)
 
   const handleNavigate = (id) => {
     setMenuOpen(false)
     scrollToId(id)
   }
 
+  // Zvýraznění sekce, ve které se návštěvník právě nachází
+  useEffect(() => {
+    const sections = ['o-nas', 'aktuality', 'palirna', 'kontakt']
+      .map((id) => document.getElementById(id))
+      .filter(Boolean)
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) setActiveId(entry.target.id)
+        }
+      },
+      // Aktivní je sekce protínající pás kolem středu obrazovky
+      { rootMargin: '-45% 0px -50% 0px' }
+    )
+    sections.forEach((s) => observer.observe(s))
+
+    const onScroll = () => setScrolled(window.scrollY > 40)
+    window.addEventListener('scroll', onScroll, { passive: true })
+    onScroll()
+
+    return () => {
+      observer.disconnect()
+      window.removeEventListener('scroll', onScroll)
+    }
+  }, [])
+
   return (
     <section id="o-nas" className="relative bg-soil">
-      <header className="absolute inset-x-0 top-0 z-30 flex items-center justify-between px-6 py-5 md:px-10 md:py-6">
-        <span className="font-sans text-lg font-semibold text-wheat">Statek Vaculovi</span>
+      <header
+        className={`fixed inset-x-0 top-0 z-[60] flex items-center justify-between px-6 py-4 transition-all duration-500 md:px-10 ${
+          scrolled
+            ? 'border-b border-wheat/10 bg-soil/90 py-3 backdrop-blur-md'
+            : 'border-b border-transparent bg-transparent py-5 md:py-6'
+        }`}
+      >
+        <button
+          onClick={() => scrollToId('o-nas')}
+          className="font-sans text-lg font-semibold text-wheat"
+        >
+          Statek Vaculovi
+        </button>
 
         <div className="hidden items-center gap-8 md:flex">
           {NAV_LINKS.map((link) => (
             <button
               key={link.id}
               onClick={() => scrollToId(link.id)}
-              className="font-sans text-sm font-light text-wheat/80 transition-colors hover:text-wheat"
+              className={`relative font-sans text-sm transition-colors ${
+                activeId === link.id
+                  ? 'font-normal text-wheat'
+                  : 'font-light text-wheat/70 hover:text-wheat'
+              }`}
             >
               {link.label}
+              <span
+                className={`absolute -bottom-1.5 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full bg-grain transition-all duration-300 ${
+                  activeId === link.id ? 'scale-100 opacity-100' : 'scale-0 opacity-0'
+                }`}
+              />
             </button>
           ))}
           <button
             onClick={() => scrollToId('kontakt')}
-            className="rounded-full bg-wheat px-5 py-2 font-sans text-sm text-soil transition-colors hover:bg-grain"
+            className={`rounded-full px-5 py-2 font-sans text-sm transition-colors ${
+              activeId === 'kontakt'
+                ? 'bg-grain text-soil'
+                : 'bg-wheat text-soil hover:bg-grain'
+            }`}
           >
             Kontaktujte nás
           </button>
@@ -131,7 +184,7 @@ export default function Hero() {
         scrollToExpand="Posouváním rozehrajete video"
         scrubOnScroll
       >
-        <div className="mx-auto flex max-w-2xl flex-col items-center text-center">
+        <div className="mx-auto flex min-h-[40vh] w-full max-w-2xl flex-col items-center justify-center text-center">
           <h1 className="font-instrument-serif text-3xl text-wheat md:text-4xl">
             Rodinná farma <em className="italic">na Moravě</em>
           </h1>
