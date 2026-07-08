@@ -13,42 +13,56 @@ const ALIGN = { dx: 56, dy: -4, scale: 0.98 }
 
 function RevealLayer({ image, cursorX, cursorY }) {
   const canvasRef = useRef(null)
-  const revealRef = useRef(null)
-  const innerRef = useRef(null)
+  const imgRef = useRef(null)
+  const [imgReady, setImgReady] = useState(false)
+
+  useEffect(() => {
+    const img = new Image()
+    img.onload = () => setImgReady(true)
+    img.src = image
+    imgRef.current = img
+  }, [image])
 
   useEffect(() => {
     const canvas = canvasRef.current
-    const inner = innerRef.current
-    if (!canvas || !inner) return
+    if (!canvas) return
     const resize = () => {
       const parent = canvas.parentElement
-      // Maska v polovičním rozlišení — maskSize 100 % ji roztáhne, gradientu to neublíží
-      canvas.width = Math.ceil(parent.offsetWidth / 2)
-      canvas.height = Math.ceil(parent.offsetHeight / 2)
-      // Zarovnání průřezu na základ: posun ve zdrojových px × aktuální cover měřítko
-      const coverScale = Math.max(parent.offsetWidth / IMG_W, parent.offsetHeight / IMG_H)
-      const tx = ALIGN.dx * coverScale
-      const ty = ALIGN.dy * coverScale
-      inner.style.transform = `translate(${tx.toFixed(1)}px, ${ty.toFixed(1)}px) scale(${ALIGN.scale})`
+      canvas.width = parent.offsetWidth
+      canvas.height = parent.offsetHeight
     }
     resize()
     window.addEventListener('resize', resize)
     return () => window.removeEventListener('resize', resize)
   }, [])
 
+  // Kreslí se přímo do viditelného canvasu (obrázek + gradient přes
+  // destination-in) — žádná CSS maska z data URL, tudíž žádné problikávání
+  // při rychlém pohybu kurzoru.
   useEffect(() => {
     const canvas = canvasRef.current
-    const reveal = revealRef.current
-    if (!canvas || !reveal || !canvas.width) return
+    const img = imgRef.current
+    if (!canvas || !canvas.width || !img || !img.complete || !img.naturalWidth) return
     const ctx = canvas.getContext('2d')
-    ctx.clearRect(0, 0, canvas.width, canvas.height)
+    const { width: w, height: h } = canvas
 
-    // Souřadnice a poloměr v polovičním měřítku masky
-    const x = cursorX / 2
-    const y = cursorY / 2
-    const radius = Math.min(130, canvas.width * 0.2)
+    ctx.clearRect(0, 0, w, h)
 
-    const gradient = ctx.createRadialGradient(x, y, 0, x, y, radius)
+    const radius = Math.min(260, w * 0.32)
+    if (cursorX < -radius || cursorY < -radius) return
+
+    // Cover mapování + kompenzace zarovnání (scale kolem středu, pak posun)
+    const coverScale = Math.max(w / IMG_W, h / IMG_H)
+    const drawScale = coverScale * ALIGN.scale
+    const drawW = IMG_W * drawScale
+    const drawH = IMG_H * drawScale
+    const dx = (w - drawW) / 2 + ALIGN.dx * coverScale
+    const dy = (h - drawH) / 2 + ALIGN.dy * coverScale
+
+    ctx.save()
+    ctx.drawImage(img, dx, dy, drawW, drawH)
+
+    const gradient = ctx.createRadialGradient(cursorX, cursorY, 0, cursorX, cursorY, radius)
     gradient.addColorStop(0, 'rgba(255,255,255,1)')
     gradient.addColorStop(0.4, 'rgba(255,255,255,1)')
     gradient.addColorStop(0.6, 'rgba(255,255,255,0.75)')
@@ -56,33 +70,17 @@ function RevealLayer({ image, cursorX, cursorY }) {
     gradient.addColorStop(0.88, 'rgba(255,255,255,0.12)')
     gradient.addColorStop(1, 'rgba(255,255,255,0)')
 
+    ctx.globalCompositeOperation = 'destination-in'
     ctx.fillStyle = gradient
-    ctx.beginPath()
-    ctx.arc(x, y, radius, 0, Math.PI * 2)
-    ctx.fill()
-
-    const mask = `url(${canvas.toDataURL()})`
-    reveal.style.maskImage = mask
-    reveal.style.webkitMaskImage = mask
-    reveal.style.maskSize = '100% 100%'
-    reveal.style.webkitMaskSize = '100% 100%'
-  }, [cursorX, cursorY])
+    ctx.fillRect(0, 0, w, h)
+    ctx.restore()
+  }, [cursorX, cursorY, imgReady])
 
   return (
-    <>
-      <canvas
-        ref={canvasRef}
-        className="pointer-events-none absolute inset-0"
-        style={{ display: 'none' }}
-      />
-      <div ref={revealRef} className="pointer-events-none absolute inset-0 z-30 overflow-hidden">
-        <div
-          ref={innerRef}
-          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-          style={{ backgroundImage: `url(${image})` }}
-        />
-      </div>
-    </>
+    <canvas
+      ref={canvasRef}
+      className="pointer-events-none absolute inset-0 z-30 h-full w-full"
+    />
   )
 }
 
@@ -103,7 +101,10 @@ export default function Palirna() {
     const handleMove = (e) => {
       const rect = section.getBoundingClientRect()
       mouse.current = { x: e.clientX - rect.left, y: e.clientY - rect.top }
-      if (smooth.current.x < -500) smooth.current = { ...mouse.current }
+      if (smooth.current.x < -500) {
+        smooth.current = { ...mouse.current }
+        setCursorPos({ ...mouse.current })
+      }
     }
 
     // Mobil: reflektor sjíždí po kotli shora dolů podle průchodu sekce viewportem
@@ -115,7 +116,10 @@ export default function Palirna() {
         x: rect.width / 2,
         y: rect.height * (0.08 + progress * 0.84),
       }
-      if (smooth.current.x < -500) smooth.current = { ...mouse.current }
+      if (smooth.current.x < -500) {
+        smooth.current = { ...mouse.current }
+        setCursorPos({ ...mouse.current })
+      }
     }
 
     if (isTouch) {
