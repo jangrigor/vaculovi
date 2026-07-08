@@ -23,13 +23,20 @@ function RevealLayer({ image, cursorX, cursorY }) {
     imgRef.current = img
   }, [image])
 
+  const [size, setSize] = useState({ w: 0, h: 0 })
+
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
     const resize = () => {
       const parent = canvas.parentElement
-      canvas.width = parent.offsetWidth
-      canvas.height = parent.offsetHeight
+      const w = parent.offsetWidth
+      const h = parent.offsetHeight
+      // Změna rozměru maže canvas — resize jen když se velikost opravdu změnila
+      if (canvas.width === w && canvas.height === h) return
+      canvas.width = w
+      canvas.height = h
+      setSize({ w, h })
     }
     resize()
     window.addEventListener('resize', resize)
@@ -74,7 +81,7 @@ function RevealLayer({ image, cursorX, cursorY }) {
     ctx.fillStyle = gradient
     ctx.fillRect(0, 0, w, h)
     ctx.restore()
-  }, [cursorX, cursorY, imgReady])
+  }, [cursorX, cursorY, imgReady, size])
 
   return (
     <canvas
@@ -157,8 +164,8 @@ export default function Palirna() {
     <section
       id="palirna"
       ref={sectionRef}
-      className="relative w-full overflow-hidden bg-[#0d0a07]"
-      style={{ height: '100dvh' }}
+      className="relative h-screen w-full overflow-hidden bg-[#0d0a07]"
+      style={{ height: '100svh' }}
     >
       <div
         className="absolute inset-0 z-10 bg-cover bg-center bg-no-repeat"
